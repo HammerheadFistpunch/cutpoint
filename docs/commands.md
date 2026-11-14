@@ -244,6 +244,33 @@ analyzed with it) and also lists the
 `action-cam` style, which the dialog preselects instead when an input has GoPro or Insta360 telemetry (a
 stream-list probe of the first 12 files `analyze` would find) unless you chose another style.
 
+### Open the workspace from another computer
+
+Keep Cutpoint running on the computer that holds the projects and footage. The UI
+listens on `127.0.0.1`, so the host's LAN address alone cannot reach it. Forward
+the UI through SSH over your LAN or WireGuard connection.
+
+1. Enable an SSH server on the Cutpoint host. On Windows, see [Install and start
+   OpenSSH Server](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?pivots=windows-11).
+2. From the client, connect to the Cutpoint computer's LAN IP using your account
+   on that computer. For example:
+
+   ```powershell
+   ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8765:127.0.0.1:8765 USER@HOST_LAN_IP
+   ```
+
+3. Leave SSH running and paste the full URL printed by Cutpoint into the browser
+   on the client, including the current `#t=…` token. Keep the URL private.
+
+For TP-Link WireGuard, connect to the VPN first and use the Cutpoint computer's
+LAN IP as the SSH destination. The VPN must route the home LAN subnet, and the
+host firewall must allow SSH from the client. From Windows, check with
+`Test-NetConnection HOST_LAN_IP -Port 22`. If the client's port 8765 is already
+in use, change the first `8765` in the command to a free port and use that port
+in the browser. Paths entered in the workspace refer to files on the Cutpoint host.
+
+### Workspace controls
+
 The header reads "cutpoint / <project name>": the name opens the project menu, which lists the projects
 (the open one marked) and ends, after a divider, with "New project…". The browser tab shows the same title.
 

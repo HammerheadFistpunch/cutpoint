@@ -307,7 +307,7 @@ class VlmParams:
     max_windows: int = 60
     frames: int = 14  # for windows up to 18 s; longer ones get up to 16
     forced: tuple[tuple[str, float, float], ...] = ()  # (name glob, start, end)
-    ctx: int = 16384
+    ctx: int = 32768
     transcript: bool = True
     hints: bool = True
     max_tokens: int = 700
