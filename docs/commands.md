@@ -225,12 +225,12 @@ error, steps after the failed one are not emitted. A first-time HUD discovery sh
 ## ui
 
 ```text
-cutpoint ui [--port 8765]
+cutpoint ui [--host 127.0.0.1] [--port 8765]
 ```
 
 Part of every install, lite included: run `cutpoint ui` (`uv run cutpoint ui` from a clone).
 
-Open the complete printed loopback URL, including `#t=…`; keep it private because it grants access
+Open the complete printed URL, including `#t=…`; keep it private because it grants access
 to local footage. The workspace can create/open projects, analyze standard video,
 preview and trim candidates, save and reorder a sequence, export clips, and assemble a final
 video with optional fades (video and audio set separately), loudness normalization, [peak compression](#peak-compression) and
@@ -246,28 +246,22 @@ stream-list probe of the first 12 files `analyze` would find) unless you chose a
 
 ### Open the workspace from another computer
 
-Keep Cutpoint running on the computer that holds the projects and footage. The UI
-listens on `127.0.0.1`, so the host's LAN address alone cannot reach it. Forward
-the UI through SSH over your LAN or WireGuard connection.
+On the Cutpoint computer, run the following with its LAN IPv4 address in place
+of the example:
 
-1. Enable an SSH server on the Cutpoint host. On Windows, see [Install and start
-   OpenSSH Server](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?pivots=windows-11).
-2. From the client, connect to the Cutpoint computer's LAN IP using your account
-   on that computer. For example:
+```powershell
+cutpoint ui --host 192.168.68.50
+```
 
-   ```powershell
-   ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8765:127.0.0.1:8765 USER@HOST_LAN_IP
-   ```
+Open the full printed URL, including the current `#t=…`, in a browser on another
+computer. The token grants access to the workspace and its footage. Paths entered
+in the workspace refer to the Cutpoint host.
 
-3. Leave SSH running and paste the full URL printed by Cutpoint into the browser
-   on the client, including the current `#t=…` token. Keep the URL private.
-
-For TP-Link WireGuard, connect to the VPN first and use the Cutpoint computer's
-LAN IP as the SSH destination. The VPN must route the home LAN subnet, and the
-host firewall must allow SSH from the client. From Windows, check with
-`Test-NetConnection HOST_LAN_IP -Port 22`. If the client's port 8765 is already
-in use, change the first `8765` in the command to a free port and use that port
-in the browser. Paths entered in the workspace refer to files on the Cutpoint host.
+Use the same address over TP-Link WireGuard. The VPN must route your home LAN,
+and the host firewall must allow inbound TCP 8765 from the LAN and VPN clients
+(or the port you set with `--port`). From a Windows client, check connectivity with
+`Test-NetConnection 192.168.68.50 -Port 8765`. This listener uses HTTP. Scope the
+firewall rule to trusted networks and keep the port off the public internet.
 
 ### Workspace controls
 
@@ -738,8 +732,7 @@ runs into a third clip of the same source, the same line says so ("Clip 1 repeat
 3"). A drag is one undo step, a run of key presses within a second too, and a roll needs saving
 like any trim. Tails are worked out again after a roll, so the exported length can change slightly.
 
-Original footage and export quality are unchanged. The server binds only to `127.0.0.1`;
-remote access is not supported.
+Original footage and export quality are unchanged.
 
 ### AI Chat
 

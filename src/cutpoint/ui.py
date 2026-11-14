@@ -109,7 +109,7 @@ from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -3002,18 +3002,6 @@ class PanoPreviews:
 
 
 # --------------------------------------------------------------------------- projects
-def _loopback_url(value: str, port: int, *, origin: bool) -> bool:
-    try:
-        parts = urlsplit(value if origin else f"//{value}")
-        return (
-            (not origin or parts.scheme == "http")
-            and parts.hostname in LOOPBACK
-            and parts.port == port
-        )
-    except ValueError:
-        return False
-
-
 def project_dir(pid: str) -> Path:
     """The project folder ``pid`` (a direct child of the projects folder), else 404; 409 while
     it is being deleted."""
@@ -5450,7 +5438,13 @@ def stitch_first(
     return cutpoint_cmd("360", "stitch", str(project), "--clips", *(c.clip_id for c in missing))
 
 
-def create_app(port: int) -> FastAPI:
+def create_app(port: int, *, host: str = "127.0.0.1") -> FastAPI:
+    hosts = LOOPBACK if host in LOOPBACK else {host}
+    authorities = {f"[{name}]" if ":" in name else name for name in hosts}
+    origin_suffix = "" if port == 80 else f":{port}"
+    allowed_origins = {f"{name}:{port}": f"http://{name}{origin_suffix}" for name in authorities}
+    if port == 80:
+        allowed_origins.update({name: f"http://{name}" for name in authorities})
     token = secrets.token_urlsafe(32)
     jobs, media, picker, sources = Jobs(), Media(), Picker(), Sources()
     lookups = MediaLookups(sources)
@@ -5484,9 +5478,9 @@ def create_app(port: int) -> FastAPI:
     @app.middleware("http")
     async def guard(request: Request, call_next):
         origin = request.headers.get("origin")
-        if not _loopback_url(request.headers.get("host", ""), port, origin=False) or (
-            origin is not None and not _loopback_url(origin, port, origin=True)
-        ):
+        authority = request.headers.get("host", "").lower()
+        expected = allowed_origins.get(authority)
+        if expected is None or (origin is not None and origin.lower() != expected):
             return JSONResponse({"detail": "forbidden host or origin"}, status_code=403)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -7655,8 +7649,8 @@ class _Hangup:
         self.server.should_exit = True
 
 
-def listen(port: int) -> socket.socket:
-    """A listening socket on 127.0.0.1:``port`` that no other program shares.
+def listen(port: int, host: str = "127.0.0.1") -> socket.socket:
+    """A listening socket on ``host:port`` that no other program shares.
 
     Raises:
         RuntimeError: If the port is already in use.
@@ -7667,7 +7661,7 @@ def listen(port: int) -> socket.socket:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         else:  # as uvicorn does: restart at once despite TIME_WAIT; a listener still blocks it
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("127.0.0.1", port))
+        sock.bind((host, port))
         sock.listen(2048)
     except OSError as err:
         sock.close()
@@ -7677,29 +7671,34 @@ def listen(port: int) -> socket.socket:
         ):
             other = port + 1 if port < 65535 else port - 1
             raise RuntimeError(
-                f"Port {port} is already in use on 127.0.0.1; pass --port <n> "
+                f"Port {port} is already in use on {host}; pass --port <n> "
                 f"(for example --port {other})"
             ) from None
         raise
     return sock
 
 
-def run(port: int = 8765) -> None:
-    """Serve the workspace on 127.0.0.1:``port`` until interrupted."""
+def run(port: int = 8765, *, host: str = "127.0.0.1") -> None:
+    """Serve the workspace on ``host:port`` until interrupted."""
     import uvicorn  # noqa: PLC0415
 
     ai_keys.capture()  # no child process of this one inherits an API key variable
-    app = create_app(port)
-    sock = listen(port)
+    app = create_app(port, host=host)
+    sock = listen(port, host)
     # Printed only once the port is ours, so the URL always works.
     # The fragment never reaches the network; the page keeps the token in sessionStorage.
-    print(f"Cutpoint UI: http://127.0.0.1:{port}/#t={app.state.token} (Ctrl+C to stop)", flush=True)
+    print(f"Cutpoint UI: http://{host}:{port}/#t={app.state.token} (Ctrl+C to stop)", flush=True)
     hangup = _Hangup()
     if hasattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, hangup)
     try:
         conf = uvicorn.Config(
-            app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=5
+            app,
+            host=host,
+            port=port,
+            proxy_headers=False,
+            log_level="warning",
+            timeout_graceful_shutdown=5,
         )
         ai_keys.redact_logs()  # again: the Config set up uvicorn's own log handlers
         server = uvicorn.Server(conf)

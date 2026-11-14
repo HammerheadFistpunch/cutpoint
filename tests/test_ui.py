@@ -1436,6 +1436,19 @@ def test_a_refused_request_says_whether_the_token_or_the_host_was_wrong(
     assert (res.status_code, res.json()) == (403, host_detail)
 
 
+def test_network_ui_requires_configured_host_same_origin_and_token() -> None:
+    host = "192.168.68.50"
+    url = f"http://{host}:{PORT}"
+    app = ui.create_app(PORT, host=host)
+    with TestClient(app, base_url=url) as client:
+        path = "/api/session"
+        assert client.get(path).json()["detail"] == "missing or wrong session token"
+        client.headers["X-Cutpoint-Token"] = app.state.token
+        assert client.get(path, headers={"Origin": url}).status_code == 200
+        assert client.get(path, headers={"Origin": "http://evil.example"}).status_code == 403
+        assert client.get(path, headers={"Host": f"evil.example:{PORT}"}).status_code == 403
+
+
 def test_the_scrolling_columns_clip_their_visually_hidden_labels() -> None:
     """Contract pin (#354): .vh labels are position: absolute. Unless .col is positioned, their
     containing block is the page, the column's overflow does not clip them, and a long moments

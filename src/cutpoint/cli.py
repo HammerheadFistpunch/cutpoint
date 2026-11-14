@@ -21,6 +21,7 @@ import urllib.error
 from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from importlib.resources import files
+from ipaddress import IPv4Address
 from pathlib import Path, PurePath
 from typing import NoReturn
 
@@ -1433,10 +1434,20 @@ def _port(text: str) -> int:
     return port
 
 
+def _ui_host(text: str) -> str:
+    try:
+        address = IPv4Address(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected a specific IPv4 address") from None
+    if address.is_unspecified or address.is_multicast or int(address) == 0xFFFFFFFF:
+        raise argparse.ArgumentTypeError("expected a specific unicast IPv4 address")
+    return str(address)
+
+
 def _cmd_ui(a: argparse.Namespace) -> None:
     from cutpoint.ui import run  # noqa: PLC0415
 
-    run(a.port)
+    run(a.port, host=a.host)
 
 
 def _add_selection_arguments(p: argparse.ArgumentParser, *, mix: bool) -> None:
@@ -2539,9 +2550,15 @@ def build_parser(profile_verbs: bool = False) -> argparse.ArgumentParser:
 
     ui = sub.add_parser(
         "ui",
-        help="serve the local browser workspace (127.0.0.1 only)",
+        help="serve the browser workspace (loopback by default)",
     )
-    ui.add_argument("--port", type=_port, default=8765, help="port on 127.0.0.1 (default 8765)")
+    ui.add_argument("--port", type=_port, default=8765, help="HTTP port (default 8765)")
+    ui.add_argument(
+        "--host",
+        type=_ui_host,
+        default="127.0.0.1",
+        help="IPv4 address to bind (default 127.0.0.1)",
+    )
     ui.set_defaults(func=_cmd_ui)
     return p
 

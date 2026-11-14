@@ -275,7 +275,7 @@ docker run --rm --network host \
 ```
 
 Open the **complete** `http://127.0.0.1:8765/#t=…` URL printed in the log; the token is
-required. The UI binds to loopback only, so Docker's bridge port publishing (`-p`) cannot reach it.
+required. The UI binds to loopback by default, so Docker's bridge port publishing (`-p`) cannot reach it.
 On Linux, `--network host` is required ([host networking](https://docs.docker.com/engine/network/drivers/host/)).
 
 Files the container writes into a bind mount belong to uid 1000 on the host. If your host user is
